@@ -25,7 +25,7 @@ Note: If you use KDE login cannot be in more than onegroup simultaneously so you
 
 ### Build the image
 ```
-docker build -t scipioncudagl .
+docker build -t scipion3cudagl .
 ```
 
 ### Test that works

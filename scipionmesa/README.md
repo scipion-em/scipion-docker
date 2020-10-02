@@ -11,6 +11,7 @@ sudo apt-get update
 sudo apt-get install docker-ce
 sudo usermod -a -G docker username
 ```
+Note: If you use KDE login cannot be in more than onegroup simultaneously so you need to change to `docker group` before running newgrp docker.
 
 ### Build the image
 ```

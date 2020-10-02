@@ -1,5 +1,5 @@
 # scipion-docker
-Docker files to build docker images with scipion installed.
+Docker file to build docker image with scipion installed using nvidia cards.
 
 ## Set up
 
@@ -21,7 +21,7 @@ sudo apt-get update
 sudo apt-get install -y nvidia-docker2
 sudo pkill -SIGHUP dockerd
 ```
-Note: If you use KDE login cannot be in more than onegroup simultaneously so you need to change to docker group before running newgrp docker.
+Note: If you use KDE login cannot be in more than onegroup simultaneously so you need to change to `docker group` before running newgrp docker.
 
 ### Build the image
 ```

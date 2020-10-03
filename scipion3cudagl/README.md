@@ -31,7 +31,7 @@ docker build -t scipion3cudagl .
 ### Test that works
 ```
 xhost +
-docker run --runtime=nvidia -ti --rm -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix scipioncudagl
+docker run --runtime=nvidia -ti --rm -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix scipion3cudagl
 ```
 
 Once in the container run `glxgears`

@@ -1,39 +1,110 @@
-# scipion-docker
-Docker file to build docker image with scipion installed using nvidia cards.
+# Scipion-docker
 
-## Set up
+This repo contains all pieces of code needed to deploy an scipion single node.
 
-### Install docker
-```
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-sudo apt-get update
-sudo apt-get install docker-ce
-sudo usermod -a -G docker username
+### Prerequisites (ubuntu packages)
+* nvidia drivers
+* docker with nVidia runtime
+* X11 server running
+* **xserver-xorg xdm xauth nvidia-container-toolkit nvidia-container-runtime nvidia-docker2**
+
+### Host machine
+#### Configure xdm
+When running on headless machine (or a machine where nobody is playing FPS games all the time), 
+make sure the X server accepts unauthenticated local connections even when a user session is not running. 
+E.g., the /etc/X11/xdm/xdm-config file should contain:
+
+    DisplayManager*authorize:       false
+
+However, such settings can be dangerous if the machine is not dedicated for this purpose, check for possible side effects.
+
+#### Configure xorg
+<!-- https://virtualgl.org/Documentation/HeadlessNV -->
+
+**1. Run `nvidia-xconfig --query-gpu-info` to obtain the bus ID of the GPU. Example:**
+
+```bash
+Number of GPUs: 1
+
+GPU #0:
+  Name      : GeForce RTX 2080 SUPER
+  UUID      : GPU-4fcfbe08-eee6-df4b-59aa-4c867e089b2f
+  PCI BusID : PCI:10:0:0
+
+  Number of Display Devices: 0
 ```
 
-### Install nvidia-docker
-```
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey |  sudo apt-key add -
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list |  sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-sudo apt-get update
-sudo apt-get install -y nvidia-docker2
-sudo pkill -SIGHUP dockerd
-```
-Note: If you use KDE login cannot be in more than onegroup simultaneously so you need to change to `docker group` before running newgrp docker.
+**2. Create an appropriate xorg.conf file for headless operation:**
 
-### Build the image
+```bash
+sudo nvidia-xconfig -a --allow-empty-initial-configuration --use-display-device=None \
+--virtual=1920x1200 --busid {busid}
 ```
-docker build -t scipioncudagl .
+Replace `{busid}` with the bus ID you obtained in Step 1. Leave out `--use-display-device=None` if the GPU is headless, i.e. if it has no display outputs.
+
+**3. If you are using version 440.xx or later of the nVidia proprietary driver, then edit /etc/X11/xorg.conf and add**
+
+```
+Option "HardDPMS" "false"
+```
+under the Device or Screen section.
+
+### Installation of prerequisites
+
+#### Docker with nVidia runtime
+
+**Docker installation**
+
+https://docs.docker.com/engine/install/ubuntu/
+
+**Nvidia container toolkit installation**
+
+Follow the instructions to install and configure the Nvidia container toolkit in the followind link.
+
+https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+
+### Build the image before running the container
+```bash
+cd scipion3cudagl
+docker build .
 ```
 
-### Test that works
+If you wish to install cryosparc please supply a valid license (--BUILD-ARG CRYOSPARC_LICENSE="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" ) otherwise pass the NOGPU argument or build will fail (--BUILD-ARG NOGPU=1)
+### Run the container
+
 ```
-xhost +
-docker run --runtime=nvidia -ti --rm -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix scipioncudagl
+docker run -d --name=scipionmaster --hostname=scipion-master --privileged -p 5904:5904 -p 2222:22 -e USE_DISPLAY="4" -e ROOT_PASS="1234" -e USER_PASS="1234" -e MYVNCPASSWORD="1234" -e CRYOSPARC_LICENSE="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" -v /tmp/.X11-unix/X0:/tmp/.X11-unix/X0 -v /home/scipionuser/ScipionUserData:/home/scipionuser/ScipionUserData scipion3cudagl
 ```
 
-Once in the container run `glxgears`
+Env var "**USE_DISPLAY**" will create new display (e.g. "**:4**").
+Please note that you need new one for each instance. Therefore change the "**USE_DISPLAY**" value for each instance.
 
+Only one-digit display number is now supported.
+
+This is also related to the port. Change last digit of the ports "**-p 5904:5904**".
+
+You should also specify the ROOT_PASSWORD, USER_PASSWORD and MYVNCPASSWORD for the docker container as well as a new cryosparc license (in case you want a different one than the one supllied at build time).
+
+It is up to you to mount a shared folder for ScipionUserData.
+
+Port 2222 allows to ssh in the docker machine.
+
+In addition, if you are using default docker runtime, you have to run the container with "**--runtime=nvidia**" parameter.
+
+### Test the container
+
+Your instance should be available on the link: "**https://your-ip-address:5904?resize=remote**".
+
+You should use the MYVNCPASSWORD to login.
+
+To check that nvidia is working fine open terminal a try "**nvidia-smi**" and "**glxgears -info**" commands.
+Both should print output containing information about your nVidia graphics card.
+
+## Licenses
+
+These Dockerfiles install several external packages with different licenses. Use the following commands to find about them:
+
+```
+docker inspect -f='{{.Config.Labels}}' scipion3cudagl
+```
 

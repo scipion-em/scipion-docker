@@ -8,10 +8,6 @@ ARG S_USER=scipionuser
 ARG S_USER_HOME=/home/${S_USER}
 ARG XMIPP_VERSION=xmippSrc-v3.23.11.0
 
-ARG TURBOVNC_VERSION=3.0.3
-ARG LIBJPEG_VERSION=3.0.1
-
-ARG SLURM_VERSION=20.11.9
 ARG CRYOSPARC_VERSION=4.4.0
 
 ARG S_USER=scipionuser
@@ -37,7 +33,6 @@ RUN apt-get update && apt-get upgrade -y
 RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends \
 	tzdata \
 	bash \
-	make \
 	curl \
 	wget \
 	openssh-client \
@@ -48,11 +43,7 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
 	flex \
 	git \
 	sudo \
-    wget \
-    gcc \
-    g++ \
 	dbus-x11 \
-	xfce4 \
 	xauth \
 	xterm \
 	konsole \
@@ -63,37 +54,26 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
 	htop \
 	iputils-ping \
 # Required by Scipion
-	libxv1 \
-	default-jdk \
+	gcc-10 \
+	g++-10 \
+	libopenmpi-dev \
+	make \
 	libfftw3-dev \
-	libtiff-dev \
-    libopenmpi-dev \
-    openmpi-bin \
-    mesa-utils \
-    cmake \
-    libnss3 \
-    libfontconfig1 \
-    libxrender1 \
-    libxtst6 \
-    xterm \
-    libasound2 \
-    libglu1 \
-    libxcursor1 \
-    libdbus-1-3 \
-    libxkbcommon-x11-0 \
-    libhdf5-dev \
+	libhdf5-dev \
+	python3-numpy \
+	python3-dev \
+	libtiff5-dev \
+	libsqlite3-dev \
+	default-jdk \
+	cmake \
 # Required by relion 4
     libxft-dev \
     libpng-dev \
-# Novnc
-    novnc \
-    python3-websockify \
-    python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
 # Create scipionuser
-RUN groupadd --gid 1042 ${S_USER} && \
-    useradd --uid 1042 --create-home --home-dir ${S_USER_HOME} -s /bin/bash -g ${S_USER} ${S_USER} && \
+RUN groupadd ${S_USER} && \
+    useradd --create-home --home-dir ${S_USER_HOME} -s /bin/bash -g ${S_USER} ${S_USER} && \
     usermod -aG sudo ${S_USER}
 
 RUN chown -R ${S_USER}:${S_USER} ${S_USER_HOME}
@@ -142,11 +122,6 @@ RUN for pl in $(cat ${S_USER_HOME}/plugin-list.txt); do ${S_USER_HOME}/scipion3/
 # Install deeplearningtoolkit
 #RUN ${S_USER_HOME}/scipion3/scipion3 installb deepLearningToolkit -j $(nproc)
 
-# Set the correct binary versions (this has to be reviewd to make it cleaner)
-
-# Modify MOTIONCOR2_BIN variable to point to cuda10.2 binary
-#RUN echo MOTIONCOR2_BIN=${S_USER_HOME}/scipion3/software/em/motioncor2-1.4.7/bin/MotionCor2_1.4.7_Cuda102_12-09-2021 >> ${S_USER_HOME}/scipion3/config/scipion.conf
-
 # Fix conda fonts
 RUN wget --progress=dot:giga http://scipion.cnb.csic.es/downloads/packages/tk-8.6.10-h14c3975_1005.tar.bz2  -O ${S_USER_HOME}/tk-8.6.10-h14c3975_1005.tar.bz2
 RUN ${S_USER_HOME}/scipion3/scipion3 run conda remove -y tk --force && ${S_USER_HOME}/scipion3/scipion3 run conda install -y ${S_USER_HOME}/tk-8.6.10-h14c3975_1005.tar.bz2
@@ -158,7 +133,7 @@ RUN rm ${S_USER_HOME}/tk-8.6.10-h14c3975_1005.tar.bz2
 
 RUN ln -s ${S_USER_HOME}/ScipionUserData/data ${S_USER_HOME}/scipion3/data
 
-RUN echo 'export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/TurboVNC/bin:$PATH' >> ${S_USER_HOME}/.bashrc
+RUN echo 'export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin    :$PATH' >> ${S_USER_HOME}/.bashrc
 
 # Copy install_cryosparc.sh script
 COPY install_cryosparc.sh ${S_USER_HOME}/
@@ -169,50 +144,12 @@ RUN if ! [ -z $CRYOSPARC_LICENSE ] && [ -z $NOGPU ]; then ${S_USER_HOME}/install
 RUN ${S_USER_HOME}/scipion3/scipion3 python -m pip install pyem
 RUN ${S_USER_HOME}/scipion3/scipion3 installp -p scipion-em-cryosparc2
 
-USER root
-
-# Install TurboVNC, noVNC
-RUN cd /tmp && \
-    curl -fsSL -O https://deac-fra.dl.sourceforge.net/project/turbovnc/${TURBOVNC_VERSION}/turbovnc_${TURBOVNC_VERSION}_amd64.deb \
-        -O https://deac-fra.dl.sourceforge.net/project/libjpeg-turbo/${LIBJPEG_VERSION}/libjpeg-turbo-official_${LIBJPEG_VERSION}_amd64.deb && \
-    dpkg -i *.deb && \
-    rm -f /tmp/*.deb && \
-    sed -i 's/$host:/unix:/g' /opt/TurboVNC/bin/vncserver
-
-RUN ln -s /lib/websockify/rebind.cpython-38-x86_64-linux-gnu.so /lib/websockify/rebind.so
-
-# Create TurboVNC config
-RUN echo 'no-remote-connections\n\
-no-httpd\n\
-no-x11-tcp-connections\n\
-no-pam-sessions\n\
-permitted-security-types = TLSVnc, TLSOtp, TLSPlain, TLSNone, X509Vnc, X509Otp, X509Plain, X509None, VNC, OTP, UnixLogin, Plain\
-' > /etc/turbovncserver-security.conf
-
-COPY res/turbovncserver.conf /etc/turbovncserver.conf
-
-COPY self.* /opt/TurboVNC/
-
 # Create Scipion icon
 RUN mkdir ${S_USER_HOME}/Desktop || true
 COPY res/scipion_logo.png ${S_USER_HOME}/scipion3/
 COPY res/Scipion.desktop ${S_USER_HOME}/Desktop/
-RUN chmod +x ${S_USER_HOME}/scipion3/scipion_logo.png && \
-    chmod +x ${S_USER_HOME}/Desktop/Scipion.desktop
 
-RUN chown -R ${S_USER}:${S_USER} ${S_USER_HOME}/Desktop
-RUN chown ${S_USER}:${S_USER} ${S_USER_HOME}/scipion3/scipion_logo.png
-
-COPY xfce4 ${S_USER_HOME}/.config/xfce4/
-RUN chown -R ${S_USER}:${S_USER} ${S_USER_HOME}/.config/xfce4
-
-# Prepare environment
-RUN mkdir /tmp/.X11-unix || true
-RUN chmod -R ugo+rwx /tmp/.X11-unix
-
-RUN echo '#!/bin/sh\n\
-xfce4-session \
-' >/tmp/xsession; chmod +x /tmp/xsession
+USER root
 
 COPY docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh

@@ -17,9 +17,7 @@ ARG CRYOSPARC_VERSION=4.4.0
 ARG S_USER=scipionuser
 ARG S_USER_HOME=/home/${S_USER}
 
-# If cryosparc license is not supplied NOGPU should be set to 1 in order not to install ir or it will fail
 ARG CRYOSPARC_LICENSE
-ARG NOGPU
 
 LABEL LICENSE_CRYOSPARC="https://guide.cryosparc.com/licensing/non-commercial-license-agreement"
 LABEL LICENSE_RELION="https://raw.githubusercontent.com/3dem/relion/master/LICENSE" \
@@ -37,7 +35,6 @@ RUN apt-get update && apt-get upgrade -y
 RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-install-recommends \
 	tzdata \
 	bash \
-	make \
 	curl \
 	wget \
 	openssh-client \
@@ -48,7 +45,7 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
 	flex \
 	git \
 	sudo \
-    wget \
+    rsync \
     gcc \
     g++ \
 	dbus-x11 \
@@ -62,33 +59,23 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" apt-get install -y --no-i
 	mesa-utils \
 	htop \
 	iputils-ping \
-# Required by Scipion
-	libxv1 \
-	default-jdk \
-	libfftw3-dev \
-	libtiff-dev \
-    libopenmpi-dev \
-    openmpi-bin \
-    mesa-utils \
-    cmake \
-    libnss3 \
-    libfontconfig1 \
-    libxrender1 \
-    libxtst6 \
     xterm \
-    libasound2 \
-    libglu1 \
-    libxcursor1 \
-    libdbus-1-3 \
-    libxkbcommon-x11-0 \
+# Required by Scipion and Xmipp
+    libopenmpi-dev \
+    make \
+    cmake \
+    libfftw3-dev \
+    python3-numpy  \
+    python3-dev  \
+    libtiff5-dev  \
+    default-jdk \
     libhdf5-dev \
+    libsqlite3-dev \
 # Required by relion 4
     libxft-dev \
     libpng-dev \
 # Novnc
     novnc \
-    python3-websockify \
-    python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
 # Create scipionuser
@@ -116,18 +103,14 @@ RUN ["/bin/bash", "-ci" , "python3 -m pip install scipion-installer"]
 RUN ["/bin/bash", "-ci" , "cd ${S_USER_HOME} && python3 -m scipioninstaller ${S_USER_HOME}/scipion3 -noAsk -noXmipp -j $(nproc)"]
 
 # Install xmipp without native compilation flags
-RUN ["/bin/bash", "-c" , "${S_USER_HOME}/scipion3/scipion3 installp -p scipion-em-xmipp -j $(nproc) --noBin"]
 RUN wget --progress=dot:giga http://scipion.cnb.csic.es/downloads/scipion/software/em/${XMIPP_VERSION}.tgz -O ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION}.tgz
 RUN tar xfz ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION}.tgz -C ${S_USER_HOME}/scipion3/software/em/
 RUN ["/bin/bash", "-c" , "cd ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION} && ${S_USER_HOME}/scipion3/scipion3 run ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION}/xmipp noAsk config"]
 RUN sed -i 's/-mtune=native -march=native //g' ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION}/xmipp.conf
-#RUN sed -i 's/CUDA=True/CUDA=False/g' ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION}/xmipp.conf
-RUN ["/bin/bash", "-c" , "cd ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION} && ${S_USER_HOME}/scipion3/scipion3 run ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION}/xmipp compile"]
-RUN ["/bin/bash", "-c" , "cd ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION} && ${S_USER_HOME}/scipion3/scipion3 run ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION}/xmipp install"]
-RUN ln -s ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION}/build ${S_USER_HOME}/scipion3/software/em/xmipp
-
-# Install pyem
-RUN ${S_USER_HOME}/scipion3/scipion3 python -m pip install pyem
+RUN sed -i 's/CUDA=True/CUDA=False/g' ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION}/xmipp.conf
+RUN ["/bin/bash", "-c" , "${S_USER_HOME}/scipion3/scipion3 run pip install scons"]
+RUN ["/bin/bash", "-c" , "cd ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION} && ${S_USER_HOME}/scipion3/scipion3 run ${S_USER_HOME}/scipion3/software/em/${XMIPP_VERSION}/xmipp"]
+RUN ["/bin/bash", "-c" , "${S_USER_HOME}/scipion3/scipion3 installp -p scipion-em-xmipp -j $(nproc)"]
 
 # data directory for mount NFS using docker volume
 RUN mkdir -p ${S_USER_HOME}/ScipionUserData/data && mkdir ${S_USER_HOME}/ScipionUserData/scipion_projects && chown $S_USER:$S_USER $S_USER_HOME/ScipionUserData
@@ -142,32 +125,23 @@ RUN for pl in $(cat ${S_USER_HOME}/plugin-list.txt); do ${S_USER_HOME}/scipion3/
 # Install deeplearningtoolkit
 #RUN ${S_USER_HOME}/scipion3/scipion3 installb deepLearningToolkit -j $(nproc)
 
-# Set the correct binary versions (this has to be reviewd to make it cleaner)
-
-# Modify MOTIONCOR2_BIN variable to point to cuda10.2 binary
-#RUN echo MOTIONCOR2_BIN=${S_USER_HOME}/scipion3/software/em/motioncor2-1.4.7/bin/MotionCor2_1.4.7_Cuda102_12-09-2021 >> ${S_USER_HOME}/scipion3/config/scipion.conf
-
 # Fix conda fonts
 RUN wget --progress=dot:giga http://scipion.cnb.csic.es/downloads/packages/tk-8.6.10-h14c3975_1005.tar.bz2  -O ${S_USER_HOME}/tk-8.6.10-h14c3975_1005.tar.bz2
 RUN ${S_USER_HOME}/scipion3/scipion3 run conda remove -y tk --force && ${S_USER_HOME}/scipion3/scipion3 run conda install -y ${S_USER_HOME}/tk-8.6.10-h14c3975_1005.tar.bz2
 
 # Remove unused files
-RUN  rm ${S_USER_HOME}/scipion3/software/em/*gz
+RUN rm ${S_USER_HOME}/scipion3/software/em/*gz
 RUN rm ${S_USER_HOME}/miniconda.sh
 RUN rm ${S_USER_HOME}/tk-8.6.10-h14c3975_1005.tar.bz2
 
 RUN ln -s ${S_USER_HOME}/ScipionUserData/data ${S_USER_HOME}/scipion3/data
 
-RUN echo 'export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/TurboVNC/bin:$PATH' >> ${S_USER_HOME}/.bashrc
+#RUN echo 'export PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/TurboVNC/bin:$PATH' >> ${S_USER_HOME}/.bashrc
 
 # Copy install_cryosparc.sh script
 COPY install_cryosparc.sh ${S_USER_HOME}/
 
-RUN if ! [ -z $CRYOSPARC_LICENSE ] && [ -z $NOGPU ]; then ${S_USER_HOME}/install_cryosparc.sh $CRYOSPARC_VERSION $CRYOSPARC_LICENSE; else echo "No cryosparc because no gpu in the server"; fi
-
-# Install cryosparc plugin
-RUN ${S_USER_HOME}/scipion3/scipion3 python -m pip install pyem
-RUN ${S_USER_HOME}/scipion3/scipion3 installp -p scipion-em-cryosparc2
+#RUN if ! [ -z $CRYOSPARC_LICENSE ]; then ${S_USER_HOME}/install_cryosparc.sh $CRYOSPARC_VERSION $CRYOSPARC_LICENSE; else echo "No cryosparc because no gpu in the server"; fi
 
 USER root
 
@@ -176,20 +150,21 @@ RUN cd /tmp && \
     curl -fsSL -O https://deac-fra.dl.sourceforge.net/project/turbovnc/${TURBOVNC_VERSION}/turbovnc_${TURBOVNC_VERSION}_amd64.deb \
         -O https://deac-fra.dl.sourceforge.net/project/libjpeg-turbo/${LIBJPEG_VERSION}/libjpeg-turbo-official_${LIBJPEG_VERSION}_amd64.deb && \
     dpkg -i *.deb && \
-    rm -f /tmp/*.deb && \
-    sed -i 's/$host:/unix:/g' /opt/TurboVNC/bin/vncserver
+    rm -f /tmp/*.deb
+    #sed -i 's/$host:/unix:/g' /opt/TurboVNC/bin/vncserver
 
-RUN ln -s /lib/websockify/rebind.cpython-38-x86_64-linux-gnu.so /lib/websockify/rebind.so
+#RUN ln -s /lib/websockify/rebind.cpython-38-x86_64-linux-gnu.so /lib/websockify/rebind.so
 
 # Create TurboVNC config
-RUN echo 'no-remote-connections\n\
-no-httpd\n\
-no-x11-tcp-connections\n\
-no-pam-sessions\n\
-permitted-security-types = TLSVnc, TLSOtp, TLSPlain, TLSNone, X509Vnc, X509Otp, X509Plain, X509None, VNC, OTP, UnixLogin, Plain\
-' > /etc/turbovncserver-security.conf
+#RUN echo  \
+#'no-remote-connections\n\
+#no-httpd\n\
+#no-x11-tcp-connections\n\
+#no-pam-sessions\n\
+#permitted-security-types = TLSVnc, TLSOtp, TLSPlain, TLSNone, X509Vnc, X509Otp, X509Plain, X509None, VNC, OTP, UnixLogin, Plain\
+#' > /etc/turbovncserver-security.conf
 
-COPY res/turbovncserver.conf /etc/turbovncserver.conf
+#COPY res/turbovncserver.conf /etc/turbovncserver.conf
 
 COPY self.* /opt/TurboVNC/
 

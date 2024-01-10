@@ -4,4 +4,3 @@ scipion-em-gctf
 scipion-em-relion
 scipion-em-cistem
 scipion-em-fsc3d
-scipion-em-cryosparc2

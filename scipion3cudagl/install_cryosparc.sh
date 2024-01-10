@@ -7,8 +7,8 @@ S_USER_HOME=/home/$S_USER
 
 export USER=$S_USER
 
-CRYOSPARC_VERSION="$1"
-CRYOSPARC_LICENSE="$2"
+CRYOSPARC_VERSION="4.4.0"
+CRYOSPARC_LICENSE="$1"
 
 mkdir ${S_USER_HOME}/cryosparc_${CRYOSPARC_VERSION}
 curl -L https://get.cryosparc.com/download/master-v${CRYOSPARC_VERSION}/${CRYOSPARC_LICENSE} -o ${S_USER_HOME}/cryosparc_${CRYOSPARC_VERSION}/cryosparc_master.tar.gz
@@ -23,3 +23,7 @@ echo -e "CRYOSPARC_HOME = $S_USER_HOME/cryosparc_${CRYOSPARC_VERSION}" >> $S_USE
 echo -e "CRYOSPARC_USER = i2pc@cnb.csic.es" >> $S_USER_HOME/scipion3/config/scipion.conf
 
 ln -s ${S_USER_HOME}/ScipionUserData/scipion_projects ${S_USER_HOME}/cryosparc_${CRYOSPARC_VERSION}/scipion_projects
+
+# Install cryosparc plugin
+${S_USER_HOME}/scipion3/scipion3 python -m pip install pyem
+${S_USER_HOME}/scipion3/scipion3 installp -p scipion-em-cryosparc2

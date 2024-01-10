@@ -66,29 +66,21 @@ https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install
 ### Build the image before running the container
 ```bash
 cd scipion3cudagl
-docker build --build-arg NOGPU=1 .
-```
-If you want to build the image without GPU support, or
-```bash
 docker build .
 ```
-If you want to build the image with GPU support
-
-If you wish to install cryosparc please supply a valid license (--build-arg CRYOSPARC_LICENSE="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" )
-
 ### Run the container
 
 ```
 docker run -d --name=scipion --hostname=scipion --privileged -p 5801:5801 -p 2222:22 -e USE_DISPLAY="1" -e ROOT_PASS="xxxx" -e USER_PASS="xxxx" -e MYVNCPASSWORD="xxxx" -v /tmp/.X11-unix/X0:/tmp/.X11-unix/X0 scipion3cudagl
 ```
 
-To run it without Cryosparc, or
+To run it without GPUs
 
 ```
-docker run -d --name=scipion --hostname=scipion --privileged -p 5801:5801 -p 2222:22 -e USE_DISPLAY="1" -e ROOT_PASS="xxxx" -e USER_PASS="xxxx" -e MYVNCPASSWORD="xxxx" -e CRYOSPARC_LICENSE="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" -v /tmp/.X11-unix/X0:/tmp/.X11-unix/X0 scipion3cudagl
+docker run -d --name=scipion --hostname=scipion --privileged -p 5801:5801 -p 2222:22 --gpus all -p 3000:3000 -e USE_DISPLAY="1" -e ROOT_PASS="xxxx" -e USER_PASS="xxxx" -e MYVNCPASSWORD="xxxx" -e CRYOSPARC_LICENSE="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" -v /tmp/.X11-unix/X0:/tmp/.X11-unix/X0 scipion3cudagl
 ```
 
-If you wish to run it with Cryosparc (image should has been built with GPU support)
+To run it with GPUs (supply Cryosparc version if you want to install it)
 
 Env var "**USE_DISPLAY**" will create new display (e.g. "**:1**").
 Please note that you need new one for each instance. Therefore change the "**USE_DISPLAY**" value for each instance.
